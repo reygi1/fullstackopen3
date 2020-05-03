@@ -50,7 +50,7 @@ app.get('/api/persons/:id', (req, res, next) => {
     
 })
 
-app.delete('/api/persons/:id', (req, res) => {
+app.delete('/api/persons/:id', (req, res, next) => {
     Person.findByIdAndRemove(req.params.id)
     .then(result => {
         res.status(204).end()
@@ -58,7 +58,7 @@ app.delete('/api/persons/:id', (req, res) => {
       .catch(error => next(error))
 })
 
-app.put('/api/persons/:id', (req, res) => { 
+app.put('/api/persons/:id', (req, res, next) => { 
     const body = req.body
 
     const person = new Person({
@@ -70,11 +70,11 @@ app.put('/api/persons/:id', (req, res) => {
     .then(updatedPerson => {
         res.json(updatedPerson.toJSON())
     })
-    .catch(error => error)
+    .catch(error => next(error))
 })
 
 
-app.post('/api/persons', (req, res) => {
+app.post('/api/persons', (req, res, next) => {
     const body = req.body
 
     if (body.name === undefined || body.number === undefined) {
@@ -85,31 +85,33 @@ app.post('/api/persons', (req, res) => {
     const person = new Person({
         name: body.name,
         number: body.number
-    })         
-    person.save().then(newP => {
-        res.json(newP.toJSON())
     })  
-  })
 
+    person.save().then(newP => newP.toJSON())
+    .then(savedAndFP => res.json(savedAndFP))
+    .catch(error => next(error))
+})
 
 
 const unknownEndpoint = (request, response) => {
     response.status(404).send({ error: 'unknown endpoint' })
   }
   
-app.use(unknownEndpoint)  
-
-
-const errorHandler = (error, request, response, next) => {
-    console.error(error.message)
+  app.use(unknownEndpoint)
   
-    if (error.name === 'CastError') {
+  const errorHandler = (error, request, response, next) => {
+    console.error(error.message)
+
+  
+    if (error.name === 'CastError' && error.kind == 'ObjectId') {
       return response.status(400).send({ error: 'malformatted id' })
-    } 
+    }  else if (error.name === 'ValidationError') {
+      return response.status(400).json({ error: error.message })
+    }
   
     next(error)
   }
-
+  
 app.use(errorHandler)
 
 
